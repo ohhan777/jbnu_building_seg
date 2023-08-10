@@ -10,9 +10,9 @@ class KariBuildingDataset(torch.utils.data.Dataset):
         self.root = Path(root)
         self.train = train
         if train:
-            self.img_dir = self.root/'kari_building_v1.5/train/images'
+            self.img_dir = self.root/'kari-building/train/images'
         else:
-            self.img_dir = self.root/'kari_building_v1.5/val/images'
+            self.img_dir = self.root/'kari-building/val/images'
         self.img_files = sorted(self.img_dir.glob('*.png'))
         self.transform = get_transforms(train)
 

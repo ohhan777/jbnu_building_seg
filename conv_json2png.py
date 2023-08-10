@@ -51,7 +51,7 @@ def read_json(label_file):
     
 
 if __name__ == '__main__':
-    img_dir = './data/kari_building_v1.5/train/images/'
+    img_dir = './data/kari-building/train/images/'
     label_dir = img_dir.replace('images/', 'labels/')
     png_label_dir = img_dir.replace('images/', 'png_labels/')
     conv_json2png(img_dir, label_dir, png_label_dir)
