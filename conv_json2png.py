@@ -3,19 +3,20 @@ import cv2
 import json
 import numpy as np
 import glob
+from utils.utils import plot_image
 
 def conv_json2png(img_dir, label_dir, png_label_dir):
     # make directory
     if not os.path.exists(png_label_dir):
         os.makedirs(png_label_dir)
     # get all image files
-    img_filenames = glob.glob(os.path.join(img_dir, '*.png'))
-    for img_filename in img_filenames:
-        print(img_filename)
+    img_files = glob.glob(os.path.join(img_dir, '*.png'))
+    for img_file in img_files:
+        print(img_file)
         # read image file
-        img = cv2.imread(img_filename)
+        img = cv2.imread(img_file)
         # read label file
-        label_filename = img_filename.replace('images/', 'labels/').replace('.png', '.json')
+        label_filename = img_file.replace('images/', 'labels/').replace('.png', '.json')
          # read json file
         labels = read_json(label_filename)
         # convert json to segmentation mask
@@ -26,8 +27,8 @@ def conv_json2png(img_dir, label_dir, png_label_dir):
             pos = np.array(label[0], dtype=np.int32).reshape(-1, 2)
             label_img = cv2.fillPoly(label_img, [pos], 255)
         # save label image
-        save_filename = os.path.join(png_label_dir, os.path.basename(img_filename).replace('.png', '_label.png'))
-        cv2.imwrite(save_filename, label_img)
+        save_file = os.path.join(png_label_dir, os.path.basename(img_file).replace('.png', '_label.png'))
+        plot_image(label_img, None, save_file)
         
 
 

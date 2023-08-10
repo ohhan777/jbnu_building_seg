@@ -4,46 +4,37 @@ import torch
 from data.kari_building_dataset import KariBuildingDataset
 from utils.utils import fitness_test
 from loss import ce_loss
-from torchvision.models.segmentation import DeepLabV3_ResNet101_Weights
+#from torchvision.models.segmentation import DeepLabV3_ResNet101_Weights
 import torch.optim as optim
 import time
+import wandb
 from pathlib import Path
 from torchvision import models
-from torch.utils.tensorboard import SummaryWriter
-
+from utils.utils import plot_image
 
 def train(opt):
     epochs = opt.epochs
     batch_size = opt.batch_size
     name = opt.name
-    # tensorboard settings
-    log_dir = Path('logs')/name
-    tb_writer = SummaryWriter(log_dir=log_dir)
- 
+    # wandb settings
+    wandb.init(id=opt.name, resume='allow')
+    wandb.config.update(opt)
+
     # Train dataset
-    train_dataset = KariBuildingDataset('./data', is_train=True)
+    train_dataset = KariBuildingDataset('./data', train=True)
     # Train dataloader
     num_workers = min([os.cpu_count(), batch_size])
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, 
                             shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
 
-    # for i, (imgs, targets) in enumerate(train_dataloader):
-    #     cv2_imshow(imgs[0], targets[0])
-    #     pass # debug checkpoint
-
     # Validation dataset
-    val_dataset = KariBuildingDataset('./data', is_train=False)
+    val_dataset = KariBuildingDataset('./data', train=False)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, 
                             shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
     
     # Network model
-    model = models.segmentation.deeplabv3_resnet101(progress=True, num_classes=2)
-    #model = models.segmentation.deeplabv3_resnet101(weights=DeepLabV3_ResNet101_Weights.DEFAULT, progress=True)
-    #num_classes = 2 # background, building
-    #model.classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
-    #model.aux_classifier[4] = torch.nn.Conv2d(256, num_classes, kernel_size=(1, 1), stride=(1, 1))
-        
-
+    model = models.segmentation.deeplabv3_resnet101(num_classes=2)
+    
     # GPU-support
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if torch.cuda.device_count() > 1:   # multi-GPU
@@ -51,8 +42,7 @@ def train(opt):
     model.to(device)
 
     # Optimizer
-    params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = optim.Adam(params, lr=3e-4)
+    optimizer = optim.Adam(model.parameters(), lr=3e-4)
       
     # Learning rate scheduler
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=1)
@@ -72,6 +62,7 @@ def train(opt):
     for epoch in range(start_epoch, end_epoch):
         print('epoch: %d/%d' % (epoch, end_epoch-1))
         t0 = time.time()
+        # training
         epoch_loss = train_one_epoch(train_dataloader, model, optimizer, device)
         t1 = time.time()
         print('loss=%.4f (took %.2f sec)' % (epoch_loss, t1-t0))
@@ -90,10 +81,8 @@ def train(opt):
         state = {'model': model.state_dict(), 'epoch': epoch, 'best_accuracy': best_accuracy}
         torch.save(state, weight_file)
         # tensorboard logging
-        tb_writer.add_scalar('train_epoch_loss', epoch_loss, epoch)
-        tb_writer.add_scalar('val_epoch_loss', val_epoch_loss, epoch)
-        tb_writer.add_scalar('val_accuracy', val_epoch_pix_accuracy, epoch)
-
+        wandb.log({'train_loss': epoch_loss, 'val_loss': val_epoch_loss, 'val_accuracy': val_epoch_pix_accuracy})
+        
 def train_one_epoch(train_dataloader, model, optimizer, device):
     model.train()
     losses = [] 
@@ -118,14 +107,20 @@ def val_one_epoch(val_dataloader, model, device):
     for i, (imgs, targets) in enumerate(val_dataloader):
         imgs, targets = imgs.to(device), targets.to(device)
         with torch.no_grad():
-            preds = model(imgs)['out']
+            preds = model(imgs)['out']   # forward, preds: (B, 2, H, W)
             loss = ce_loss(preds, targets)
-            preds = torch.argmax(preds, axis=1)
+            preds = torch.argmax(preds, axis=1) # (1, H, W)
             iou, pix_accuracy = fitness_test(preds, targets.long())   
             losses.append(loss.item())
             iou_sum += iou.sum().item()
             pix_accuracy_sum += pix_accuracy.sum().item()
             total += preds.size(0)
+            # sample images
+            if i == 0:
+                for j in range(3):
+                    save_file = os.path.join('outputs', 'val_%d.png' % j)
+                    plot_image(imgs[j], preds[j], save_file)
+                
             
     avg_loss = torch.tensor(losses).mean().item()
     avg_iou = iou_sum/total
@@ -135,9 +130,9 @@ def val_one_epoch(val_dataloader, model, device):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=200, help='target epochs')
-    parser.add_argument('--batch-size', type=int, default=8, help='batch size')
-    parser.add_argument('--name', default='test1', help='name for the run')
+    parser.add_argument('--epochs', type=int, default=250, help='target epochs')
+    parser.add_argument('--batch-size', type=int, default=16, help='batch size')
+    parser.add_argument('--name', default='ohhan', help='name for the run')
 
     opt = parser.parse_args()
 

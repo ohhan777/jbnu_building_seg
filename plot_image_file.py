@@ -2,14 +2,15 @@ import os
 import cv2
 import json
 import numpy as np
+from utils.utils import plot_image
 
-def plot_image(img_filename, label_filename=None):
+def plot_image_file(img_file, label_file=None):
     # read image file
-    img = cv2.imread(img_filename)
+    img = cv2.imread(img_file)
     # read json file
-    if label_filename is not None:
+    if label_file is not None:
         # read json file
-        labels = read_json(label_filename)
+        labels = read_json(label_file)
         # convert json to segmentation mask
         # draw segmentation masks
         h, w, c = img.shape
@@ -17,13 +18,12 @@ def plot_image(img_filename, label_filename=None):
         for label in labels:
             pos = np.array(label[0], dtype=np.int32).reshape(-1, 2)
             label_img = cv2.fillPoly(label_img, [pos], (0, 0, 255))
-
-        # overlay images
-        img = cv2.addWeighted(label_img, 0.3, img, 1.0, 0)
+    else:
+        label_img = None
         
     # save image
-    save_filename = os.path.basename(img_filename).replace('.png', '_overlay.png' if label_filename is not None else '.png')
-    cv2.imwrite(save_filename, img)
+    save_file = os.path.basename(img_file).replace('.png', '_overlay.png' if label_file is not None else '.png')
+    plot_image(img, label_img, save_file)
 
 
 def read_json(label_file):
@@ -46,7 +46,9 @@ def read_json(label_file):
 
 
 if __name__ == '__main__':
-    img_filename = './data/kari_building_v1.5/train/images/BLD00001_PS3_K3A_NIA0276.png'
-    label_filename = img_filename.replace('images/', 'labels/').replace('.png', '.json')
-    plot_image(img_filename, label_filename)
+    img_file = './data/kari_building_v1.5/train/images/BLD00001_PS3_K3A_NIA0276.png'
+    label_file = img_file.replace('images/', 'labels/').replace('.png', '.json')
+    plot_image_file(img_file)
+    #plot_image_file(img_file, label_file)
+    
     
