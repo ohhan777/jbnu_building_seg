@@ -48,7 +48,7 @@ def read_json(label_file):
 if __name__ == '__main__':
     img_file = './data/kari-building/train/images/BLD00001_PS3_K3A_NIA0276.png'
     label_file = img_file.replace('images/', 'labels/').replace('.png', '.json')
-    plot_image_file(img_file)
-    #plot_image_file(img_file, label_file)
+    #plot_image_file(img_file)
+    plot_image_file(img_file, label_file)
     
     
